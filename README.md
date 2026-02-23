@@ -7,3 +7,4 @@
 |-|-|-|
 |1.| Visual Studio Code | https://code.visualstudio.com/download |
 |2.| PlatformIO | https://docs.platformio.org/en/latest/integration/ide/vscode.html | 
+|3.| Git | https://git-scm.com/install/windows / https://habr.com/ru/articles/541258/|
