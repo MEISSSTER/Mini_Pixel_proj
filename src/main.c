@@ -3,7 +3,7 @@
 #include "freertos/task.h"
 #include "driver/gpio.h" // Основная библиотека для работы с пинами
 
-#define LED_PIN 2 // Номер встроенного светодиода
+#define LED_PIN 44 // Номер встроенного светодиода
 
 void app_main(void) {
     // 1. Сброс и настройка пина
