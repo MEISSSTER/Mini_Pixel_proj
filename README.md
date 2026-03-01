@@ -21,3 +21,6 @@
 |2.| PlatformIO | https://docs.platformio.org/en/latest/integration/ide/vscode.html | 
 |3.| Git | https://git-scm.com/install/windows / https://habr.com/ru/articles/541258/|
 |4.| Proteus | Пираты впрерёд, пока нет ссылки на нормальный файл |
+
+
+### Текущие задачи: https://app.striveapp.ru/join/86dc772f-b0de-4d36-9c0d-0f7b8b92f3bd
