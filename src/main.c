@@ -1,25 +1,39 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/gpio.h" // Основная библиотека для работы с пинами
+#include "driver/gpio.h"
 
-#define LED_PIN 44 // Номер встроенного светодиода
+#define LED_PIN  44 
+#define STEP_PIN 1
+#define DIR_PIN  2
 
 void app_main(void) {
-    // 1. Сброс и настройка пина
     gpio_reset_pin(LED_PIN);
-    gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
+
+    gpio_reset_pin(STEP_PIN);
+    gpio_set_direction(STEP_PIN, GPIO_MODE_OUTPUT);
+
+    gpio_reset_pin(DIR_PIN);
+    gpio_set_direction(DIR_PIN, GPIO_MODE_OUTPUT);
 
     while(1) {
-        // 2. Включить/выключить (1 или 0)
-        printf("LED ON\n");
+        printf("Step\n");
+        gpio_set_level(DIR_PIN, 1);
         gpio_set_level(LED_PIN, 1);
-        
-        // 3. Задержка (в FreeRTOS измеряется в тиках)
-        vTaskDelay(1000 / portTICK_PERIOD_MS); 
-
-        printf("LED OFF\n");
+        gpio_set_level(STEP_PIN, 1);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        gpio_set_level(LED_PIN, 0);
+        gpio_set_level(STEP_PIN, 0);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        printf("Stepback\n");
+        gpio_set_level(DIR_PIN, 0);
+        gpio_set_level(LED_PIN, 1);
+        gpio_set_level(STEP_PIN, 1);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        gpio_set_level(STEP_PIN, 0);
         gpio_set_level(LED_PIN, 0);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+    }
+        
 }
