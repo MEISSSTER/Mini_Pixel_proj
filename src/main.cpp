@@ -5,7 +5,7 @@
 #include "Stepmotor.h"
 
 #define LED_PIN GPIO_NUM_44  // пин, к которому подключен светодиод
-void app_main(void) {
+extern "C" void app_main(void) {
     StepMotor stepMotor;
     stepMotor.begin();
     stepMotor.enable();
