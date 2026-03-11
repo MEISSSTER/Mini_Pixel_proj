@@ -12,11 +12,18 @@
 #define PIN_ENDSTOP     GPIO_NUM_4   // Концевой выключатель (LOW = нажат)
 
 // ─── Параметры движения ───────────────────────────────────────
-#define STEP_DELAY_US       800      // Задержка между импульсами (мкс) — скорость
-#define HOMING_STEP_DELAY_US 1500    // Скорость при калибровке (медленнее)
-#define STEPS_PER_MM        80       // Шагов на 1 мм (полный шаг, 1/1)
-#define BACKOFF_STEPS       200      // Отъезд от концевика после homing (шагов)
-#define MAX_TRAVEL_STEPS    50000    // Макс. ход (защита от выезда за пределы)
+#define STEP_DELAY_US        800     // Задержка между импульсами (мкс) — скорость
+#define HOMING_STEP_DELAY_US 1500   // Скорость при калибровке (медленнее)
+#define STEPS_PER_MM         80     // Шагов на 1 мм (полный шаг, 1/1)
+#define BACKOFF_STEPS        200    // Отъезд от концевика после homing (шагов)
+#define MAX_TRAVEL_STEPS     50000  // Макс. ход (защита от выезда за пределы)
+
+// ─── Параметры цикла печати слоя ──────────────────────────────
+// Последовательность на каждый слой:
+//   1. Подъём на (PEEL_LIFT_MM + layer_height) — отрыв от FEP плёнки
+//   2. Опускание на PEEL_LIFT_MM — возврат к позиции экспозиции
+//   3. Засветка ультрафиолетом
+#define PEEL_LIFT_MM         5.0f   // Высота дополнительного подъёма для отрыва (мм)
 
 // ─── Направления ──────────────────────────────────────────────
 #define DIR_UP    1
@@ -33,7 +40,9 @@ static const char* TAG_MOTOR = "StepMotor";
  *  - DIR определяет направление
  *  - Концевик подтянут к VCC, при нажатии — GND (LOW)
  */
-class StepMotor {
+
+class StepMotor 
+{
 public:
     StepMotor() : _position(0), _isHomed(false) {}
 
@@ -191,12 +200,42 @@ public:
     }
 
     /**
-     * @brief Подъём на один слой (для печати)
-     * @param layer_height_mm Высота слоя в мм
+     * @brief Полный цикл движения для одного слоя (peel sequence)
+     *
+     * Последовательность:
+     *   1. Подъём на (PEEL_LIFT_MM + layer_height_mm) — отрывает слой от FEP плёнки
+     *   2. Опускание на PEEL_LIFT_MM — возвращает платформу на высоту следующей экспозиции
+     *   После возврата вызывающий код должен выполнить UV-засветку.
+     *
+     * @param layer_height_mm  Высота слоя в мм
+     * @return true если оба движения выполнены успешно
      */
-    bool liftLayer(float layer_height_mm) {
-        ESP_LOGI(TAG_MOTOR, "Lifting layer: %.3f mm", layer_height_mm);
-        return moveMM(layer_height_mm);
+    bool printLayerSequence(float layer_height_mm) {
+        if (!_isHomed) {
+            ESP_LOGE(TAG_MOTOR, "Not homed! Call homing() first.");
+            return false;
+        }
+
+        float lift_total = PEEL_LIFT_MM + layer_height_mm;
+
+        // Шаг 1: Подъём вверх на (5мм + высота слоя)
+        ESP_LOGI(TAG_MOTOR, "Peel lift: +%.3f mm (5.0 peel + %.3f layer)",
+                 lift_total, layer_height_mm);
+        if (!moveMM(lift_total)) {
+            ESP_LOGE(TAG_MOTOR, "Lift failed!");
+            return false;
+        }
+
+        // Шаг 2: Опускание вниз на 5мм — платформа остаётся на высоте слоя
+        ESP_LOGI(TAG_MOTOR, "Retract: -%.3f mm", PEEL_LIFT_MM);
+        if (!moveMM(-PEEL_LIFT_MM)) {
+            ESP_LOGE(TAG_MOTOR, "Retract failed!");
+            return false;
+        }
+
+        ESP_LOGI(TAG_MOTOR, "Layer sequence done. Z = %.3f mm", getPositionMM());
+        return true;
+        // → Вызывающий код выполняет UV-экспозицию
     }
 
     /**
