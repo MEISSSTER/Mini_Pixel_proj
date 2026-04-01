@@ -1,4 +1,4 @@
-# **Mini_Pixel**
+**Mini_Pixel**
 # Текущие задачи: https://app.striveapp.ru/join/86dc772f-b0de-4d36-9c0d-0f7b8b92f3bd
 
 ## Написание кода
@@ -15,11 +15,13 @@
 |1.| ESP32-S3 | [Datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-s3_datasheet_en.pdf) | Основной контроллер. Логика 3.3В. |
 |2.| DC CONVERTER LM2596 | [Datasheet](https://www.ti.com/lit/ds/symlink/lm2596.pdf) | Понижающий модуль. Настроить на 5В перед подключением. |
 |3.| SONGLE SRD-05VDC-SL-C | [Datasheet](https://html.alldatasheet.com/html-pdf/99638/SONGLE/SRD-05VDC-SL-C/238/1/SRD-05VDC-SL-C.html) | Реле 5В. Управлять через транзистор + защитный диод. |
-|4.| ili9488 x2 | [Datasheet](https://www.displayfuture.com/Display/Datasheet/Controller/ILI9488.pdf) | В Proteus можно использовать аналог (ILI9341). Нужны разные CS. (Есть только один сломанный) |
+|4.| ili9488 x2 | [Datasheet](https://www.displayfuture.com/Display/Datasheet/Controller/ILI9488.pdf) | В Proteus можно использовать аналог (ILI9341). Купили новые* Уже есть  |
 |5.| Шаговый двигатель nema17 17mm | [Specs](https://www.reprap.org/wiki/NEMA_17_Stepper_motor) | Требуется внешний драйвер **A4988**. |
 |6.| A4988 | [Datasheet](https://www.pololu.com/file/0J450/A4988.pdf) | Драйвер шагового двигателя. VMOT от внешнего БП 12В. VDD от ESP32 3.3В. |
-|7.| UV матрица 12В | — | Управляется через реле. Ток замерить перед выбором БП. |
-|8.| Концевой выключатель | — | Калибровка нулевой позиции оси Z (homing). |
+|7.| TMC2100 | — | Драйвер для шагового дв. пока вообще не ясно работатет ли он...|
+|8.| UV матрица 12В | — | Управляется через реле. Ток замерить перед выбором БП. |
+|9.| Концевой выключатель | — | Калибровка нулевой позиции оси Z (homing). |
+
 
 ## Схема питания
 ```
@@ -32,7 +34,7 @@
 ```
 
 > ⚠️ Общий GND обязателен для всех компонентов.
-> ⚠️ Конденсатор 100мкФ электролит + 100нФ керамика параллельно на VMOT — обязательно.
+> ⚠️ Конденсатор 100мкФ электролит параллельно на VMOT — обязательно.
 
 ## Подключение A4988
 
@@ -46,6 +48,27 @@
 |RST|SLP|Соединить вместе|
 |MS1/MS2/MS3|GND|Полный шаг|
 |VMOT|12В внешний БП|Питание мотора|
+
+## Подключение TMC2100
+
+| TMC2100 | ESP32-S3 | Описание |
+|---|---|---|
+|GND| GND ||
+|VIO| | |
+|M1B| | |
+|M1A| | |
+|M2A| | |
+|M2B| | |
+|GND| | |
+|VM| | |
+|DIR| | |
+|STEP| | |
+|NC| | |
+|NC| | |
+|CFG3| | |
+|CFG2| | |
+|CFG1| | |
+|EN| | |
 
 ## Калибровка оси Z (Homing)
 
