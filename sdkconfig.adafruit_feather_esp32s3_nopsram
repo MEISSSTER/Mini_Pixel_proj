@@ -2375,6 +2375,12 @@ CONFIG_LV_ASSERT_HANDLER_INCLUDE="assert.h"
 # end of Asserts
 
 #
+# Check arg
+#
+# CONFIG_LV_USE_CHECK_ARG is not set
+# end of Check arg
+
+#
 # Debug
 #
 # CONFIG_LV_USE_REFR_DEBUG is not set
