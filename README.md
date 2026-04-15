@@ -5,6 +5,14 @@
 Код для МК **ESP32-S3**, код можно писать в **Visual Studio Code** с дополнением **PlatformIO**, на данный момент тестируется и будет проверятся.
 Не забываем загружать всё на GitHub, делать это через VS Code можно из коробки, главное иметь Git на компьютере, и настроить чуток (https://habr.com/ru/articles/541258/).
 
+|Библеотека|Документация|
+|---|---|---|
+|PlatfromIO|🫥|
+|ESP-IDF|[Link](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/index.html)|
+|LVGL|[Link](https://docs.lvgl.io/master/getting_started/index.html)|
+|esp_lcd(spi)|[Link](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/peripherals/lcd/spi_lcd.html)|
+
+
 Код пишется под **ESP-IDF**
 
 ## Тестирование логической схемы
@@ -82,3 +90,6 @@
 |2.| PlatformIO | https://docs.platformio.org/en/latest/integration/ide/vscode.html |
 |3.| Git | https://git-scm.com/install/windows / https://habr.com/ru/articles/541258/ |
 |4.| Proteus | Пираты вперёд, пока нет ссылки на нормальный файл |
+
+
+
