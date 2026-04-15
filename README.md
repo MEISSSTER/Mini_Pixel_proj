@@ -6,7 +6,7 @@
 Не забываем загружать всё на GitHub, делать это через VS Code можно из коробки, главное иметь Git на компьютере, и настроить чуток (https://habr.com/ru/articles/541258/).
 
 |Библеотека|Документация|
-|---|---|---|
+|---|---|
 |PlatfromIO|🫥|
 |ESP-IDF|[Link](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/index.html)|
 |LVGL|[Link](https://docs.lvgl.io/master/getting_started/index.html)|
