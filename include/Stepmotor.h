@@ -5,72 +5,69 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
-// ─── Пины A4988 ───────────────────────────────────────────────
-#define PIN_STEP        GPIO_NUM_1   // STEP  → A4988
-#define PIN_DIR         GPIO_NUM_2   // DIR   → A4988
-#define PIN_EN          GPIO_NUM_3   // EN    → A4988 (LOW = вкл)
-#define PIN_ENDSTOP     GPIO_NUM_4   // Концевой выключатель (LOW = нажат)
+// Пины драйвера
+#define PIN_STEP GPIO_NUM_1    // Пин для импульса
+#define PIN_DIR GPIO_NUM_2     // Пин для направления
+#define PIN_ENABLE GPIO_NUM_3  // Пин для включения
 
-// ─── Параметры движения ───────────────────────────────────────
-#define STEP_DELAY_US        800     // Задержка между импульсами (мкс) — скорость
-#define HOMING_STEP_DELAY_US 1500   // Скорость при калибровке (медленнее)
-#define STEPS_PER_MM         80     // Шагов на 1 мм (полный шаг, 1/1)
-#define BACKOFF_STEPS        200    // Отъезд от концевика после homing (шагов)
-#define MAX_TRAVEL_STEPS     50000  // Макс. ход (защита от выезда за пределы)
+// Пин концевика
+#define PIN_ENDSTOP GPIO_NUM_4
 
-// ─── Параметры цикла печати слоя ──────────────────────────────
-// Последовательность на каждый слой:
-//   1. Подъём на (PEEL_LIFT_MM + layer_height) — отрыв от FEP плёнки
-//   2. Опускание на PEEL_LIFT_MM — возврат к позиции экспозиции
-//   3. Засветка ультрафиолетом
-#define PEEL_LIFT_MM         5.0f   // Высота дополнительного подъёма для отрыва (мм)
-
-// ─── Направления ──────────────────────────────────────────────
-#define DIR_UP    1
-#define DIR_DOWN  0
+// Параметры движения
+#define STEP_DELAY 800        // Задержка импульсов в мкс
+#define HOMING_STEP_DELAY 1500 // Задержка импульсов при калибровке в мкс
+#define STEPS_PER_MM 80       // Шагов на 1мм
+#define BACKOFF_STEPS 200     // Выход на рабочий 0
+#define MAX_STEPS 50000       // Максимально кол-во шагов (Защита от выхода)
+#define LIFT_MM 5.0f          // Высота для отрыва
+#define DIR_UP 1              // Направление вниз 
+#define DIR_DOWN 0            // Направление вниз
 
 static const char* TAG_MOTOR = "StepMotor";
 
-/**
- * @brief Класс управления шаговым двигателем NEMA17 через драйвер A4988
- *
- * Логика:
- *  - EN активен LOW (мотор держит позицию при LOW, отпускает при HIGH)
- *  - Каждый импульс на STEP = 1 шаг
- *  - DIR определяет направление
- *  - Концевик подтянут к VCC, при нажатии — GND (LOW)
- */
+/** 
+*   @brief Класс управления шаговым длигателем NEMA17
+*   Логика печати слоя:
+*       1. Подъем на LIFT_MM + layer_height
+*       2. Опускание на layer_height
+*       3. Засвет
 
-class StepMotor 
+*   Логика управления двигателем:
+*      1. ENABLE активен при LOW (Мотор держит позицию - LOW, отпускает при HIGH) 
+*      2. Каждый импуль на STEP = шаг
+*      3. DIR - направление
+*      4. Концевик с внутренней подтяжкой, нажатие = LOW 
+*/
+
+class StepMotor
 {
 public:
     StepMotor() : _position(0), _isHomed(false) {}
-
     /**
-     * @brief Инициализация GPIO
+     * @brief Инициализация пинов
      */
-    void begin() {
-        // Настройка выходов
+    void begin()
+    {
         gpio_config_t out_cfg = {};
-        out_cfg.pin_bit_mask = (1ULL << PIN_STEP) |
-                               (1ULL << PIN_DIR)  |
-                               (1ULL << PIN_EN);
+        out_cfg.pin_bit_mask =  (1ULL << PIN_STEP) | 
+                                (1ULL << PIN_DIR)  | 
+                                (1ULL << PIN_ENABLE);
         out_cfg.mode         = GPIO_MODE_OUTPUT;
         out_cfg.pull_up_en   = GPIO_PULLUP_DISABLE;
         out_cfg.pull_down_en = GPIO_PULLDOWN_DISABLE;
         out_cfg.intr_type    = GPIO_INTR_DISABLE;
-        gpio_config(&out_cfg);
 
-        // Настройка входа концевика (подтяжка к VCC)
         gpio_config_t in_cfg = {};
         in_cfg.pin_bit_mask  = (1ULL << PIN_ENDSTOP);
         in_cfg.mode          = GPIO_MODE_INPUT;
-        in_cfg.pull_up_en    = GPIO_PULLUP_ENABLE;   // нет внешней подтяжки — используем внутреннюю
+        in_cfg.pull_up_en    = GPIO_PULLUP_ENABLE;
         in_cfg.pull_down_en  = GPIO_PULLDOWN_DISABLE;
         in_cfg.intr_type     = GPIO_INTR_DISABLE;
+
+        gpio_config(&out_cfg);
         gpio_config(&in_cfg);
 
-        disable();  // Мотор выключен до homing
+        disable();
         gpio_set_level(PIN_STEP, 0);
         gpio_set_level(PIN_DIR, DIR_UP);
 
@@ -78,191 +75,192 @@ public:
     }
 
     /**
-     * @brief Включить мотор (держит позицию)
+     * @brief Включить мотор (Держит позицию)
      */
-    void enable() {
-        gpio_set_level(PIN_EN, 0);  // EN = LOW → активен
+    void enable()
+    {
+        gpio_set_level(PIN_ENABLE, 0);
     }
 
     /**
-     * @brief Выключить мотор (катушки обесточены)
+     * @brief Выключить мотор (Обесточить катушки. отпускает позицию)
      */
-    void disable() {
-        gpio_set_level(PIN_EN, 1);  // EN = HIGH → отключён
+    void disable()
+    {
+        gpio_set_level(PIN_ENABLE, 1);
     }
 
     /**
-     * @brief Сделать N шагов в заданном направлении
-     * @param steps     Количество шагов
-     * @param direction DIR_UP или DIR_DOWN
-     * @param delay_us  Задержка между шагами (мкс)
-     * @return true если движение выполнено, false если достигнут концевик (при движении вниз)
+     * @brief Сделать заданное количество шагов в заданном направлении
+     * @param steps Количество шагов
+     * @param direction DIR_UP - Вверх, DIR_DOWN - Вниз
+     * @param delay_us Задержка между шагами в мкс. Задана по умолчанию
+     * @return true если движение выполнено успешно, false если достигнут концевик
      */
-    bool move(int32_t steps, uint8_t direction, uint32_t delay_us = STEP_DELAY_US) {
+    bool move(int32_t steps, uint8_t direction, uint32_t delay_us = STEP_DELAY)
+    {
         if (steps <= 0) return true;
 
         gpio_set_level(PIN_DIR, direction);
-        esp_rom_delay_us(2);  // Минимальная выдержка после смены DIR (A4988: ≥200нс)
+        esp_rom_delay_us(2);
 
-        for (int32_t i = 0; i < steps; i++) {
-            // Проверка концевика при движении вниз
-            if (direction == DIR_DOWN && isEndstopTriggered()) {
-                ESP_LOGW(TAG_MOTOR, "Endstop hit after %ld steps", i);
+        for (int32_t i = 0; steps > i; i++)
+        {
+            if (direction == DIR_DOWN && isEndstopTriggered())
+            {
+                ESP_LOGW(TAG_MOTOR, "endstop is triggered after %ld steps", i);
                 _position = 0;
                 return false;
             }
 
-            // Генерация импульса STEP (A4988: HIGH ≥1мкс, LOW ≥1мкс)
             gpio_set_level(PIN_STEP, 1);
             esp_rom_delay_us(2);
             gpio_set_level(PIN_STEP, 0);
             esp_rom_delay_us(delay_us);
 
-            // Обновление позиции
-            if (direction == DIR_UP)   _position++;
-            else                       _position--;
+            if (direction == DIR_UP)  _position++;
+            else                      _position--;
         }
         return true;
     }
 
     /**
-     * @brief Переместить на заданное количество миллиметров
-     * @param mm        Расстояние в мм (+ = вверх, - = вниз)
+     * @brief Переместить платформу на заданное количество миллиметров в заданном направлении
+     * @param mm Расстояние в миллиметрах
+     * @param direction DIR_UP - Вверх, DIR_DOWN - Вниз.
      */
-    bool moveMM(float mm) {
-        if (!_isHomed) {
+    bool moveMM(float mm, uint8_t direction)
+    {
+        if (!_isHomed)
+        {
             ESP_LOGE(TAG_MOTOR, "Not homed! Call homing() first.");
             return false;
         }
+
         int32_t steps = (int32_t)(mm * STEPS_PER_MM);
-        uint8_t dir   = (steps > 0) ? DIR_UP : DIR_DOWN;
-        return move(abs(steps), dir);
+        return move(abs(steps), direction);
     }
 
     /**
-     * @brief Калибровка нулевой позиции (Homing)
-     *
+     * @brief Калибровка двигателя до нулевой позиции
+     * Реализация через концевик в виде кнопки
      * Алгоритм:
-     *  1. Едем вниз до срабатывания концевика
-     *  2. Немного откатываемся вверх (backoff)
-     *  3. Медленно снова вниз до концевика (точная позиция)
-     *  4. Откатываемся на BACKOFF_STEPS — это рабочий Z=0
+     *      1. Спуск до кнопки со скорость калибровки
+     *      2. ОПЦИОНАЛЬНО!!! Откат на рабочий 0
      */
-    bool homing() {
-        ESP_LOGI(TAG_MOTOR, "Starting homing...");
+    bool homing()
+    {
         enable();
-
-        // Фаза 1: Быстрый спуск до концевика
-        ESP_LOGI(TAG_MOTOR, "Phase 1: Fast descent...");
         bool endstopHit = false;
-        for (int32_t i = 0; i < MAX_TRAVEL_STEPS; i++) {
-            if (isEndstopTriggered()) {
+
+        // Фаза 1
+        for (int32_t i = 0; i < MAX_STEPS; i++)
+        {
+            if (isEndstopTriggered())
+            {
                 endstopHit = true;
                 break;
             }
+
             gpio_set_level(PIN_DIR, DIR_DOWN);
             esp_rom_delay_us(2);
             gpio_set_level(PIN_STEP, 1);
             esp_rom_delay_us(2);
             gpio_set_level(PIN_STEP, 0);
-            esp_rom_delay_us(HOMING_STEP_DELAY_US);
+            esp_rom_delay_us(HOMING_STEP_DELAY);
         }
 
-        if (!endstopHit) {
+        if (!endstopHit)
+        {
             ESP_LOGE(TAG_MOTOR, "Homing failed: endstop not reached!");
             disable();
             return false;
         }
 
-        // Фаза 2: Откат вверх
-        ESP_LOGI(TAG_MOTOR, "Phase 2: Backoff...");
-        move(BACKOFF_STEPS, DIR_UP, HOMING_STEP_DELAY_US);
-
-        // Фаза 3: Медленный спуск до концевика (точная позиция)
-        ESP_LOGI(TAG_MOTOR, "Phase 3: Slow precise descent...");
-        for (int32_t i = 0; i < BACKOFF_STEPS * 2; i++) {
-            if (isEndstopTriggered()) break;
-            gpio_set_level(PIN_DIR, DIR_DOWN);
-            esp_rom_delay_us(2);
-            gpio_set_level(PIN_STEP, 1);
-            esp_rom_delay_us(2);
-            gpio_set_level(PIN_STEP, 0);
-            esp_rom_delay_us(HOMING_STEP_DELAY_US * 2);  // Ещё медленнее
-        }
-
-        // Фаза 4: Финальный откат — это Z=0
-        move(BACKOFF_STEPS, DIR_UP, HOMING_STEP_DELAY_US);
+        // Фаза 2 - ОПЦИОНАЛЬНО
+        // move(BACKOFF_STEPS, DIR_UP);
 
         _position = 0;
-        _isHomed  = true;
+        _isHomed = true;
         ESP_LOGI(TAG_MOTOR, "Homing complete. Z=0 set.");
         return true;
     }
 
     /**
-     * @brief Полный цикл движения для одного слоя (peel sequence)
-     *
-     * Последовательность:
-     *   1. Подъём на (PEEL_LIFT_MM + layer_height_mm) — отрывает слой от FEP плёнки
-     *   2. Опускание на PEEL_LIFT_MM — возвращает платформу на высоту следующей экспозиции
-     *   После возврата вызывающий код должен выполнить UV-засветку.
-     *
+     * @brief Полный цикл движения двигателя для отпечатки слоя
+     * 
+     *   Последовательность:
+     *      1. Подъём на (LIFT_MM + layer_height_mm) — отрывает слой от FEP плёнки
+     *      2. Опускание на LIFT_MM — возвращает платформу на высоту следующей экспозиции
+     *      3. Засветка слоя
+     * 
      * @param layer_height_mm  Высота слоя в мм
      * @return true если оба движения выполнены успешно
      */
-    bool printLayerSequence(float layer_height_mm) {
-        if (!_isHomed) {
+    bool printLayerSequence(float layer_height_mm) 
+    {
+        if (!_isHomed) 
+        {
             ESP_LOGE(TAG_MOTOR, "Not homed! Call homing() first.");
             return false;
         }
 
-        float lift_total = PEEL_LIFT_MM + layer_height_mm;
+        float lift_total = LIFT_MM + layer_height_mm;
 
-        // Шаг 1: Подъём вверх на (5мм + высота слоя)
-        ESP_LOGI(TAG_MOTOR, "Peel lift: +%.3f mm (5.0 peel + %.3f layer)",
-                 lift_total, layer_height_mm);
-        if (!moveMM(lift_total)) {
+        // Фаза 1
+        if (!moveMM(lift_total, DIR_UP))
+        {
             ESP_LOGE(TAG_MOTOR, "Lift failed!");
             return false;
         }
 
-        // Шаг 2: Опускание вниз на 5мм — платформа остаётся на высоте слоя
-        ESP_LOGI(TAG_MOTOR, "Retract: -%.3f mm", PEEL_LIFT_MM);
-        if (!moveMM(-PEEL_LIFT_MM)) {
+        // Фаза 2
+        if (!moveMM(LIFT_MM, DIR_DOWN))
+        {
             ESP_LOGE(TAG_MOTOR, "Retract failed!");
             return false;
         }
-
+        
+        // Фаза 3
         ESP_LOGI(TAG_MOTOR, "Layer sequence done. Z = %.3f mm", getPositionMM());
-        return true;
-
-        // → Вызывающий код выполняет UV-экспозицию (Сделать в другом заголовочном файле вместе с выводом изображения на экран)
+        return true; 
+        // Вызывающий код выполняет UV-экспозицию
     }
-
+    
     /**
      * @brief Проверить состояние концевика
      * @return true если нажат
      */
-    bool isEndstopTriggered() const {
-        return gpio_get_level(PIN_ENDSTOP) == 0;  // LOW = нажат
+    bool isEndstopTriggered() const
+    {
+        return gpio_get_level(PIN_ENDSTOP) == 0;
     }
 
     /**
      * @brief Текущая позиция в шагах
      */
-    int32_t getPositionSteps() const { return _position; }
+    int32_t getPositionSteps() const
+    {
+        return _position;
+    }
 
     /**
      * @brief Текущая позиция в мм
      */
-    float getPositionMM() const { return (float)_position / STEPS_PER_MM; }
+    int32_t getPositionMM() const
+    {
+        return (float)_position / STEPS_PER_MM;
+    }
 
     /**
      * @brief Была ли выполнена калибровка
      */
-    bool isHomed() const { return _isHomed; }
+    bool isHomed() const
+    {
+        return _isHomed;
+    }
 
 private:
-    int32_t _position;  // Текущая позиция в шагах (0 = Z=0 после homing)
-    bool    _isHomed;   // Флаг: калибровка выполнена
+    int32_t _position; // Текущая позиция в шагах
+    bool _isHomed; // Флаг калибровки двигателя
 };
