@@ -39,7 +39,6 @@
 └── → LM2596 → 5В → ESP32 VIN
                      └── ESP32 3.3V → A4988 VDD
                                     → ILI9488 x2 VCC
-
 ```
 
 ## Подключение A4988
@@ -76,9 +75,54 @@
 | CFG1 | GND / VIO | Настройка режима работы | 
 | EN | GPIO | Разрешение работы драйвера (Enable) | 
 
-## Калибровка оси Z (Homing)
+## Принцип работы устройства
 
-Используется **концевой выключатель**. Платформа едет вниз до срабатывания — это и есть Z = 0.
+```mermaid
+graph TD
+    classDef core0 fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000;
+    classDef core1 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000;
+    classDef mem fill:#fff3e0,stroke:#e65100,stroke-width:2px,stroke-dasharray: 5 5,color:#000;
+
+    subgraph Core1 ["Ядро 1 (Пользовательский интерфейс)"]
+        UI1["Опрос тачскрина"] --> UI2{"Есть нажатие?"}
+        UI2 -- Да --> UI3["Запись команды (PAUSE)"]
+        UI2 -- Нет --> UI4["Чтение % печати"]
+        UI4 --> UI5["Отрисовка графики (LovyanGFX)"]
+        UI5 --> UI1
+    end
+
+    subgraph Shared ["Общая память (Глобальные флаги)"]
+        CMD[("cmd_state (Команды)")]
+        PROG[("print_progress (Прогресс)")]
+    end
+
+    subgraph Core0 ["Ядро 0 (Движок печати - State Machine)"]
+        S1["STATE_INIT\n(Калибровка Z=0)"] --> S2["STATE_PRELOAD\n(Чтение 10 слоев с SD)"]
+        S2 --> S3["STATE_LOWER\n(Вывод кадра, спуск)"]
+        
+        S3 --> S4["STATE_EXPOSE\n(ВКЛ UV-Света)"]
+        
+        S4 -. "В простое\n(пока светит)" .-> SD["Фоновое чтение\nслоя с SD в буфер"]
+        SD -.-> S4
+        
+        S4 --> S5["STATE_LIFT\n(ВЫКЛ UV-Света, подъем)"]
+        
+        S5 --> S6{"Проверка флагов"}
+        S6 -- "PLAY" --> S3
+        S6 -- "Конец" --> S7["STATE_FINISH\n(Парковка)"]
+    end
+
+    %% Межъядерное взаимодействие через память
+    UI3 -. "Пишет" .-> CMD
+    PROG -. "Читает" .-> UI4
+    
+    S5 -. "Пишет" .-> PROG
+    CMD -. "Читает" .-> S6
+
+    class Core0 core0;
+    class Core1 core1;
+    class Shared mem;
+```
 
 ### Ссылки на скачку
 
