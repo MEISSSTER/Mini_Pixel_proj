@@ -79,10 +79,6 @@
 
 ```mermaid
 graph TD
-    classDef core0 fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#000;
-    classDef core1 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000;
-    classDef mem fill:#fff3e0,stroke:#e65100,stroke-width:2px,stroke-dasharray: 5 5,color:#000;
-
     subgraph Core1 ["Ядро 1 (Пользовательский интерфейс)"]
         UI1["Опрос тачскрина"] --> UI2{"Есть нажатие?"}
         UI2 -- Да --> UI3["Запись команды (PAUSE)"]
@@ -118,10 +114,6 @@ graph TD
     
     S5 -. "Пишет" .-> PROG
     CMD -. "Читает" .-> S6
-
-    class Core0 core0;
-    class Core1 core1;
-    class Shared mem;
 ```
 
 ### Ссылки на скачку
